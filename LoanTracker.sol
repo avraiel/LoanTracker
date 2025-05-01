@@ -1,7 +1,9 @@
 // DISCS Certificate of Authorship - Code Comment Block Certification
 // [Student Full Name]-[ID Number]-[Section]
 
+// Julia Anishka Espera-212319-MT
 // Gabriel I. Geraldo-212734-MT
+// Ysabella Panghulan-214521-MT
 
 // I hereby attest to the truth of the following facts:
 
@@ -21,5 +23,87 @@ pragma solidity >=0.8.2 <0.9.0;
 
 
 public contract LoanTracker {
+    address public admin;
+    uint256 public interestRate;
+    uint256 public loanCounter;
+    mapping(uint256 => Loan) public loans;
+    mapping(address => uint256[]) public borrowerLoans;
+    
+    enum LoanStatus { Pending, Approved, Rejected, Completed }
 
+    struct Loan {
+        uint256 id;
+        address borrower;
+        uint256 amount;
+        uint256 interestRate;
+        LoanStatus status;
+        uint256 totalRepaid;
+        uint256 createdAt;
+        uint256 dueDate;
+    }
+
+    modifier onlyAdmin() {
+        require(msg.sender == admin, "Only admin can perform this action");
+        _;
+    }
+
+    modifier onlyBorrower(uint256 loanId) {
+        require(loans[loanId].borrower == msg.sender, "Not the borrower");
+        _;
+    }
+
+    constructor() {
+        admin = msg.sender;
+        interestRate = 500; // default 5% interest rate
+    }
+
+
+    function setInterestRate(uint256 newRate) external onlyAdmin {
+        require(newRate <= 10000, "Max interest is 100%");
+        interestRate = newRate;
+    }
+
+    function requestLoan(uint256 amount) external {
+        loanCounter++;
+
+        uint256 createdAt = block.timestamp;
+        uint256 dueDate = createdAt + 30 days;
+
+        loans[loanCounter] = Loan({
+            id: loanCounter,
+            borrower: msg.sender,
+            amount: amount,
+            interestRate: interestRate,
+            status: LoanStatus.Pending,
+            totalRepaid: 0,
+            createdAt: createdAt,
+            dueDate: dueDate
+        });
+
+        borrowerLoans[msg.sender].push(loanCounter);
+    }
+
+    function approveLoan(uint256 loanId) external onlyAdmin {
+        require(loans[loanId].status == LoanStatus.Pending, "Loan not pending");
+        loans[loanId].status = LoanStatus.Approved;
+    }
+
+    function rejectLoan(uint256 loanId) external onlyAdmin {
+        require(loans[loanId].status == LoanStatus.Pending, "Loan not pending");
+        loans[loanId].status = LoanStatus.Rejected;
+    }
+
+    function repayLoan(uint256 loanId, uint256 amount) external onlyBorrower(loanId) {
+        Loan storage loan = loans[loanId];
+
+        require(loan.status == LoanStatus.Approved, "Loan not approved");
+        require(block.timestamp <= loan.dueDate, "Loan overdue");
+
+        loan.totalRepaid += amount;
+
+        uint256 totalDue = loan.amount + (loan.amount * loan.interestRate / 10000);
+        if (loan.totalRepaid >= totalDue) {
+            loan.status = LoanStatus.Completed;
+        }
+    }
 }
