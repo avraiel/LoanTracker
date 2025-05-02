@@ -154,12 +154,12 @@ contract LoanTracker {
 
         loan.amountToBePaid -= msg.value;
         loan.totalRepaid += msg.value;
-        loan.dueDate += 30 days; // add more 30 days to the due date if partial payment is made
         uint256 totalDue = loan.amount + (loan.amount * loan.interestRate / 10000);
         
         if (block.timestamp > loan.dueDate) {
             totalDue += (loan.amount * latePenalty / 10000);
         }
+        loan.dueDate += 30 days; // add more 30 days to the due date if partial payment is made
 
         if (loan.totalRepaid >= totalDue) {            
             loan.status = LoanStatus.Completed;
