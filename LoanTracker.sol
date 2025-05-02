@@ -130,18 +130,7 @@ contract LoanTracker {
         interestRate = newRate;
     }
     
-///// NOT IN USE YET /////////////////////////////////////////////////////////////////
-    // Allow the contract to receive funds
-    receive() external payable {
-        emit ContractFunded(msg.sender, msg.value);
-    }
-    
-    // Function to fund the contract explicitly
-    function fundContract() external payable onlyAdmin {
-        require(msg.value > 0, "Must send ETH to fund contract");
-        emit ContractFunded(msg.sender, msg.value);
-    }
-/////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 
     // BORROWER ONLY FUNCTIONS FOR LOAN
     function repayLoan(uint256 loanId) external payable onlyBorrower(loanId) {
