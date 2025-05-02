@@ -62,19 +62,6 @@ contract LoanTracker {
         loanCounter = 0;
     }
 
-    function sample(uint256 xd) public view returns (uint256) {
-        uint256 principal = xd * SCALING_FACTOR; // 250 pesos
-        return principal + principal * interestRate / 10000;
-    }
-
-    function revert_back(uint256 scaled_value) public pure returns (uint256, bool) {
-        // original value may have at most a +1 due to the floating point. LoanTracker will treat this as a convenience fee to be processed
-        uint256 og = scaled_value / SCALING_FACTOR;
-        // uint256 principal = xd * SCALING_FACTOR; // 250 pesos
-        bool last_two = scaled_value % 100 == 0;
-        return (og, last_two);
-    }
-
     function calculateToBePaid(uint256 principal) internal view returns (uint256) {
         uint256 scaled_principal = principal * 100;
         uint256 scaled_toBePaid = scaled_principal + scaled_principal * interestRate / 10000;
@@ -93,15 +80,11 @@ contract LoanTracker {
     // CREATES A NEW LOAN REQUEST IN THE TRACKER
     // Input is regular amount but this will be scaled when kept inside the contract
     // If the amount to be paid is seen to have a floating point, this value will be rounded up to account for convenience fees.
-    function requestLoan(uint256 principal, uint256 installments) external {
-        require(installments == 1 || installments == 2 || installments == 4, "Installments must be either 1, 2, or 4");
-        
-
+    function requestLoan(uint256 principal) external {        
         uint256 createdAt = block.timestamp;
         uint256 dueDate = createdAt + 30 days;
-        // uint256 interest = principal * interestRate / 10000;
-        uint256 amountToBePaid = calculateToBePaid(principal);
 
+        uint256 amountToBePaid = calculateToBePaid(principal);
 
         loans[loanCounter] = Loan({
             id: loanCounter,
@@ -122,12 +105,6 @@ contract LoanTracker {
     // EVENTS
     event ContractFunded(address funder, uint256 amount);
 
-    // HELPER FUNCTION
-    // function getInstallmentAmount(uint256 loanId) internal view returns(uint256) {
-    //     Loan storage loan = loans[loanId];
-    //     return (loan.amount + loan.amount * loan.interestRate / 10000) / loan.installments;
-    // }
-
     // ADMIN ONLY FUNCTIONS
     function approveLoan(uint256 loanId) external payable onlyAdmin {
         require(loans[loanId].status == LoanStatus.Pending, "Loan not pending");
@@ -135,8 +112,6 @@ contract LoanTracker {
         Loan storage loan = loans[loanId];
 
         loan.status = LoanStatus.Approved;
-        // loan.dueDate = block.timestamp + 30 days * loan.installments;
-        // loan.nextDueDate = block.timestamp + 30 days; // first payment in 1 month
         
         address recipient = loan.borrower;
         uint256 amount = loan.amount;
@@ -172,22 +147,24 @@ contract LoanTracker {
     function repayLoan(uint256 loanId) external payable onlyBorrower(loanId) {
         Loan storage loan = loans[loanId];
 
-
-
         require(loan.status == LoanStatus.Approved, "Loan not approved");
-        require(msg.value == 0, "Must send Ether to repay loan");
-        
+        require(msg.value > 0, "Must send Ether to repay loan");
+
+        require(msg.value <= loan.amountToBePaid, "Overpayment not allowed");
+
+        loan.amountToBePaid -= msg.value;
         loan.totalRepaid += msg.value;
-        uint256 totalDue = loan.amount + (loan.amount * loan.interestRate / 10000);
+        loan.dueDate += 30 days; // add more 30 days to the due date if partial payment is made
 
         if (block.timestamp > loan.dueDate) {
             totalDue += (loan.amount * latePenalty / 10000);
         }
 
-        if (loan.totalRepaid >= totalDue) {
+        if (loan.totalRepaid >= totalDue) {            
             loan.status = LoanStatus.Completed;
         }
     }
+
 
     // VIEW LOAN FUNCTIONS
     function getLoan(uint256 loanId) external view onlyAdmin returns (
@@ -250,9 +227,6 @@ contract LoanTracker {
         uint256[] memory totalRepaids,
         uint256[] memory createdAts,
         uint256[] memory dueDates
-        // uint256[] memory installments,
-        // uint256[] memory nextDueDates,
-        // uint256[] memory installmentsPaid
     ) {
         ids = new uint256[](loanCounter);
         borrowers = new address[](loanCounter);
@@ -263,9 +237,6 @@ contract LoanTracker {
         totalRepaids = new uint256[](loanCounter);
         createdAts = new uint256[](loanCounter);
         dueDates = new uint256[](loanCounter);
-        // installments = new uint256[](loanCounter);
-        // nextDueDates = new uint256[](loanCounter);
-        // installmentsPaid = new uint256[](loanCounter);
 
         for (uint256 i = 0; i < loanCounter; i++) {
             Loan storage loan = loans[i];
@@ -278,9 +249,6 @@ contract LoanTracker {
             totalRepaids[i] = loan.totalRepaid;
             createdAts[i] = loan.createdAt;
             dueDates[i] = loan.dueDate;
-            // installments[i] = loan.installments;
-            // nextDueDates[i] = loan.nextDueDate;
-            // installmentsPaid[i] = loan.installmentsPaid;
         }
     }
 }
