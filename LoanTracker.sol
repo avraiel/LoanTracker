@@ -163,6 +163,7 @@ contract LoanTracker {
 
         if (loan.totalRepaid >= totalDue) {            
             loan.status = LoanStatus.Completed;
+            loan.amountToBePaid = 0;
         }
     }
 
