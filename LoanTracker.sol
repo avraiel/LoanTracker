@@ -1,8 +1,10 @@
 // DISCS Certificate of Authorship - Code Comment Block Certification
 // [Student Full Name]-[ID Number]-[Section]
 
+// Terran M. Chato-211422-MT
 // Julia Anishka Espera-212319-MT
 // Gabriel I. Geraldo-212734-MT
+// Kyle Joshua Ozo-214425-MT
 // Ysabella Panghulan-214521-MT
 
 // I hereby attest to the truth of the following facts:
@@ -22,12 +24,13 @@
 pragma solidity >=0.8.2 <0.9.0;
 
 
-public contract LoanTracker {
+contract LoanTracker {
     address public admin;
     uint256 public interestRate;
     uint256 public loanCounter;
     mapping(uint256 => Loan) public loans;
     mapping(address => uint256[]) public borrowerLoans;
+    uint256 public latePenalty = 500;
     
     enum LoanStatus { Pending, Approved, Rejected, Completed }
 
@@ -97,11 +100,14 @@ public contract LoanTracker {
         Loan storage loan = loans[loanId];
 
         require(loan.status == LoanStatus.Approved, "Loan not approved");
-        require(block.timestamp <= loan.dueDate, "Loan overdue");
 
         loan.totalRepaid += amount;
-
         uint256 totalDue = loan.amount + (loan.amount * loan.interestRate / 10000);
+
+        if (block.timestamp > loan.dueDate) {
+            totalDue += (loan.amount * latePenalty / 10000);
+        }
+
         if (loan.totalRepaid >= totalDue) {
             loan.status = LoanStatus.Completed;
         }
